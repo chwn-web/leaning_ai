@@ -2,27 +2,40 @@
 
 代码区。每个项目一个独立子目录，**建议各自独立 git 仓库**（方便单独开源、单独做 GitHub 展示）。
 
-## 先看 `_template/`（所有项目的起点）
+## 先看 `_template-py/`（所有项目的起点，主线）
 
-`_template/` 是一份**零依赖、可直接运行**的 Agent 骨架，不是框架，是"每一层都能被追问"的可运行代码。
+`_template-py/` 是一份**零依赖、可直接运行**的 Python Agent 骨架，不是框架，是"每一层都能被追问"的可运行代码。
+
+```powershell
+cd projects/_template-py
+python src/main.py            # 8 个场景：正常 / 参数自修复 / 死循环熔断 / 写操作拦截 / 幂等重放 / 预算终止 / 工具报错
+python src/eval/run.py --k 3  # pass@k、pass^k、95% 置信区间、样本量警告
+```
+
+- 不需要 `pip install` 任何东西（Python ≥ 3.11，只用标准库）
+- 七层分层 + ADR（为什么主线用 Python 而不是 TS）
+- 开新项目的做法：复制整个目录，只改 3 个文件（`src/tools/builtin.py`、`src/main.py`、`data/golden.jsonl`）
+
+详见 [`_template-py/README.md`](_template-py/README.md)、[`_template-py/docs/adr/0001-python-mainline.md`](_template-py/docs/adr/0001-python-mainline.md)。
+
+## 再看 `_template/`（TypeScript 版，对照用）
+
+同一套七层的 TS 实现，用来：① 需要前端集成时直接复用；② 对照两门语言写同一套架构的差异（面试聊"你只会一门语言吗"时有话说）。
 
 ```powershell
 cd projects/_template
-node src/main.ts              # 5 类场景：正常 / 参数错 / 死循环 / 写操作幂等 / 预算耗尽
-node src/eval/run.ts --k 3    # pass@k、pass^k、95% 置信区间
+node src/main.ts              # 5 类场景
+node src/eval/run.ts --k 3    # 评测
 ```
 
-- 不需要 `npm install`（Node ≥ 22 原生跑 TS）
-- 七层分层 + 两份 ADR（为什么这么分层、为什么只有 transient 可重试）
-- 开新项目的做法：复制整个目录，只改 3 个文件（`src/tools/builtin.ts`、`src/main.ts`、`data/golden.jsonl`）
-
-详见 [`_template/README.md`](_template/README.md)、[`_template/docs/adr/0001-layering.md`](_template/docs/adr/0001-layering.md)、[`../kb/03-框架/03-统一项目骨架.md`](../kb/03-框架/03-统一项目骨架.md)。
+详见 [`_template/README.md`](_template/README.md)、[`../kb/03-框架/03-统一项目骨架.md`](../kb/03-框架/03-统一项目骨架.md)。
 
 ## 项目一览
 
 | 目录 | 项目 | 周次 | 状态 | 简历价值 |
 |---|---|---|---|---|
-| `_template/` | 统一骨架（可运行 demo） | W1 | ✅ 已完成 | 讲"分层与取舍"的实物证据 |
+| `_template-py/` | 统一骨架（Python，主线） | W1 | ✅ 已完成 | 讲"分层与取舍"的实物证据 |
+| `_template/` | 统一骨架（TS，对照/前端集成） | W1 | ✅ 已完成 | 同上的第二语言版本 |
 | `p0-llm-gateway/` | 多模型网关 | W1–W2 | 未开始 | 低（基础设施，但能讲成本与选型） |
 | `p1-tool-agent/` | 工具型 Agent | W3–W9 | 未开始 | 中 |
 | `p2-rag-agent/` | 知识库 Agent + 评测 | W10–W15 | 未开始 | **最高** |

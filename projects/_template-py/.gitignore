@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/traces/
+data/*.log
+out.txt
+eval.txt
+.env

@@ -1,0 +1,8 @@
+# 本骨架故意零依赖：只需 Python 3.11+，不需要 pip install。
+# 当你要接真实模型/向量库时，把依赖加到这里再 `pip install -r requirements.txt`。
+#
+# 起步建议（按需取消注释）：
+# openai>=1.40.0        # 或者继续用内置 urllib 版 llm/provider.py
+# httpx>=0.27.0         # 需要并发/流式时
+# pgvector>=0.2.5       # W10 做向量检索时
+# pytest>=8.0.0         # 想写单测时（评测器不需要它）
