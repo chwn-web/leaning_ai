@@ -1,0 +1,23 @@
+﻿# 依赖与构建产物
+node_modules/
+dist/
+out/
+
+# 环境变量与密钥（绝不提交）
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# 运行时产物：trace / 日志 / 评测输出
+**/data/traces/
+logs/
+*.log
+.tmp-*/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

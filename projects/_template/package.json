@@ -1,0 +1,14 @@
+{
+  "name": "agent-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-dependency AI agent skeleton for Node 24 native TypeScript.",
+  "scripts": {
+    "demo": "node src/main.ts",
+    "eval": "node src/eval/run.ts"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
