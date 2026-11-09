@@ -180,7 +180,7 @@ const DOC_CORPUS: DocEntry[] = [
   },
   {
     docId: "doc-105",
-    title: "tenanta 专属配额",
+    title: "tenant-a 专属配额",
     text: "tenant-a 的专属配额为每月 200 万次调用。配额用尽后需要提交扩容审批，审批通过后次日生效。",
     acl: ["tenant-a"],
   },

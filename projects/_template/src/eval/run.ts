@@ -75,8 +75,8 @@ function createEvalScript(): (req: LLMRequest) => LLMResponse {
       const input = last.content;
 
       if (input.includes("不提供表达式")) {
-        // 故意触发 missing required field "expression"，验证错误会回填给模型。
-        return callTool("calculator", {});
+        // 用户没给表达式 → 正确做法是直接问清楚，而不是先调工具碰运气。
+        return stop("请补充要计算的表达式（例如：2 + 3 * 4），我再帮你算。");
       }
 
       if (input.includes("工单")) {
@@ -139,7 +139,10 @@ function judge(
   const answer = result.finalContent;
   const refused = REFUSAL_MARKERS.some((marker) => answer.includes(marker));
   const expectsRefusal = goldenCase.tags.some((tag) => EXPECTED_REFUSAL_TAGS.has(tag));
-
+  // 为什么这里不再额外加"出现过 validation_error 就判失败"的规则：
+  // 那条规则会把"用户本来就没给全信息、agent 如实说明"也判成失败，而这类
+  // 回答恰恰是我们想要的行为。防止"什么都说无法完成来混过评测"靠的是另一半
+  // 规则——happy 用例里出现拒绝会被判 over_refusal，两条合起来才平衡。
   if (expectsRefusal) {
     return refused ? { ok: true } : { ok: false, tag: goldenCase.tags[0] ?? "no_refusal" };
   }

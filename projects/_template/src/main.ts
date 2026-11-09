@@ -1,26 +1,31 @@
 /**
- * 骨架 demo 的入口。
+ * 骨架 demo 入口。
  *
  * 运行：node src/main.ts
  *
- * 这个文件只做一件事：用 MockProvider 把"真实 agent 会遇到的 5 种情况"
- * 各跑一遍，让你看到每一层的输出长什么样。
+ * 这个文件是组合根：只负责把 provider、工具、预算、tracer 组装起来，
+ * 然后把一次完整 agent 运行拆成可观察的五段输出：
+ *   1. 每一步做了什么、耗时多少
+ *   2. 最终答案
+ *   3. 预算快照
+ *   4. tracer 汇总
+ *   5. trace 文件路径
  *
- * 它刻意不联网、不读真实模型——因为骨架的价值是"任意时刻都能重放"。
- * 真实 provider（OpenAICompatProvider）的实现已经写在 llm/provider.ts 里，
- * 换成它只需要改一行构造。
- *
- * 五个场景对应后面项目的第一课：
- *   1 正常链路      → 工具调用 + 观察回填 + 收敛
- *   2 参数校验失败  → 错误信息回填给模型，模型自己修
- *   3 死循环        → 用动作签名检测，不是靠步数硬砍
- *   4 写操作        → 幂等键 + 人工确认 + 重放不重复建单
- *   5 预算耗尽      → 花完钱之前先停，而不是崩
+ * 最后再演示一次失败路径：模型漏传 required 字段时，registry 返回
+ * validation 错误，并由 agent 作为 tool observation 回填给模型。
+ * 全程使用 MockProvider，不发起真实网络请求。
  */
 
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Budget } from "./core/budget.ts";
-import type { LLMRequest, LLMResponse, Message, RunResult, ToolCall } from "./core/types.ts";
+import type {
+  LLMRequest,
+  LLMResponse,
+  Message,
+  RunResult,
+  Span,
+} from "./core/types.ts";
 import { MockProvider } from "./llm/provider.ts";
 import { ToolRegistry } from "./tools/registry.ts";
 import { builtinTools } from "./tools/builtin.ts";
@@ -28,280 +33,244 @@ import { Tracer } from "./obs/tracer.ts";
 import { runAgent } from "./agent/loop.ts";
 
 const TRACE_DIR = fileURLToPath(new URL("../data/traces", import.meta.url));
+const TENANT_ID = "tenant-a";
 const SYSTEM_PROMPT =
-  "你是内部支持助手。先判断能否用工具拿到事实；工具报错时不要编造，按错误提示修正或直接说明无法完成。";
+  "你是内部支持助手。先用工具拿事实，再回答；工具报错时不要编造，要按错误提示修正或明确说明无法完成。";
 
-/** 每次 mock 调用的固定开销，方便观察 cost 累加 */
-const MOCK_USAGE = { inputTokens: 160, outputTokens: 32, costUsd: 0.0004 };
+const MOCK_USAGE = {
+  inputTokens: 120,
+  outputTokens: 30,
+  costUsd: 0.0004,
+};
 
 function stop(content: string): LLMResponse {
-  return { content, toolCalls: [], usage: { ...MOCK_USAGE }, finishReason: "stop" };
+  return {
+    content,
+    toolCalls: [],
+    usage: { ...MOCK_USAGE },
+    finishReason: "stop",
+  };
 }
 
-function callTools(calls: ToolCall[]): LLMResponse {
-  return { content: "", toolCalls: calls, usage: { ...MOCK_USAGE }, finishReason: "tool_calls" };
+function callTool(toolName: string, args: Record<string, unknown>): LLMResponse {
+  return {
+    content: "",
+    toolCalls: [{ id: `demo-${randomUUID()}`, name: toolName, args }],
+    usage: { ...MOCK_USAGE },
+    finishReason: "tool_calls",
+  };
+}
+
+interface CalcObservation {
+  expression: string;
+  result: number;
+}
+
+interface DocHit {
+  title: string;
+  span: { quote: string };
+}
+
+interface SearchObservation {
+  results: DocHit[];
+}
+
+function parseToolJson<T>(content: string): T | undefined {
+  try {
+    return JSON.parse(content) as T;
+  } catch {
+    return undefined;
+  }
 }
 
 function lastMessage(req: LLMRequest): Message | undefined {
   return req.messages.length > 0 ? req.messages[req.messages.length - 1] : undefined;
 }
 
-interface Scenario {
-  id: string;
-  title: string;
-  question: string;
-  /** 你期望看到的现象，打印在结果行里，逼你"先预测再运行" */
-  expect: string;
-  /** 这个场景证明了哪一层在起作用 */
-  lesson: string;
-  script: (req: LLMRequest) => LLMResponse;
-  budget?: { maxSteps: number; maxCostUsd: number; maxWallMs: number };
-  tenantId?: string;
-  idempotencyKey?: string;
+/**
+ * 三轮 mock 脚本：
+ *   第 1 轮：调用 calculator 计算 2 + 3 * 4
+ *   第 2 轮：拿到结果后调用 search_docs 查询退款政策
+ *   第 3 轮：读取两份 observation，返回最终答案
+ *
+ * 脚本读取的是完整的 request.messages，所以它能看到上一轮 tool 消息，
+ * 这就是 MockProvider 支持多轮决策的方式。
+ */
+function demoScript(req: LLMRequest): LLMResponse {
+  const toolMessages = req.messages.filter((message) => message.role === "tool");
+
+  if (toolMessages.length === 0) {
+    return callTool("calculator", { expression: "2 + 3 * 4" });
+  }
+
+  if (toolMessages.length === 1) {
+    return callTool("search_docs", { query: "退款政策", topK: 3 });
+  }
+
+  const calc = parseToolJson<CalcObservation>(toolMessages[0].content);
+  const search = parseToolJson<SearchObservation>(toolMessages[1].content);
+  const quote = search?.results[0]?.span.quote ?? "知识库未返回可引用的退款条款";
+  const result = calc?.result ?? "未知";
+
+  return stop(`2 + 3 * 4 = ${result}。根据知识库：${quote}`);
 }
 
-interface ScenarioOutcome {
-  id: string;
-  title: string;
-  result: RunResult;
-  tracePath?: string;
-  expect: string;
-  lesson: string;
+function groupSteps(result: RunResult, tracer: Tracer): string[] {
+  const steps: Array<{ tools: string[]; durationMs: number }> = [];
+
+  for (const message of result.messages) {
+    if (message.role === "assistant") {
+      steps.push({ tools: [], durationMs: 0 });
+    } else if (message.role === "tool" && steps.length > 0) {
+      steps[steps.length - 1].tools.push(message.name ?? "tool");
+    }
+  }
+
+  const stepSpans = tracer
+    .getSpans()
+    .filter((span: Span) => span.kind === "step")
+    .sort((left: Span, right: Span) => left.startMs - right.startMs);
+  const toolSpans = tracer
+    .getSpans()
+    .filter((span: Span) => span.kind === "tool")
+    .sort((left: Span, right: Span) => left.startMs - right.startMs);
+
+  let toolIndex = 0;
+  return steps.map((step, index) => {
+    const span = stepSpans[index];
+    if (span?.endMs !== undefined) {
+      step.durationMs = Math.max(0, span.endMs - span.startMs);
+    }
+
+    const actions = ["llm"];
+    for (const toolName of step.tools) {
+      const toolSpan = toolSpans[toolIndex];
+      toolIndex += 1;
+      const toolMs =
+        toolSpan?.endMs !== undefined ? Math.max(0, toolSpan.endMs - toolSpan.startMs) : 0;
+      actions.push(`${toolName}(${toolMs}ms)`);
+    }
+
+    return `step ${index + 1}: ${actions.join(" -> ")} | ${step.durationMs}ms`;
+  });
 }
 
-async function runScenario(scenario: Scenario): Promise<ScenarioOutcome> {
-  const tracer = new Tracer({
-    traceId: `${scenario.id}-${Date.now().toString(36)}`,
-    dir: TRACE_DIR,
+function findObservation(messages: Message[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "tool") return messages[index].content;
+  }
+  return "(没有 tool observation)";
+}
+
+/**
+ * 失败路径演示：故意漏掉 calculator 的 required 参数 expression。
+ *
+ * 关键不是"报错"，而是错误要可读、可回填：
+ *   validation_error: missing required field "expression" (string): ...
+ * 模型下一次调用会看到这句话，因此有机会自己修正；这里演示它仍然
+ * 无法完成时，agent 应该停下来，而不是编造一个计算结果。
+ */
+async function runFailurePath(): Promise<void> {
+  console.log("");
+  console.log("=== 失败路径演示：缺 required 参数被回填给模型 ===");
+
+  const registry = new ToolRegistry();
+  for (const tool of builtinTools) registry.register(tool);
+
+  const direct = await registry.execute("calculator", {}, {
+    tenantId: TENANT_ID,
+    traceId: "failure-demo",
+  });
+  console.log("registry.execute(calculator, {})");
+  console.log(`  ok=${direct.ok}, errorKind=${direct.errorKind ?? "none"}, durationMs=${direct.durationMs}`);
+  console.log(`  observation: ${direct.content}`);
+
+  const provider = new MockProvider({
+    name: "mock-failure",
+    script: (req: LLMRequest): LLMResponse => {
+      const message = lastMessage(req);
+      if (message?.role === "tool") {
+        return stop(`模型看到 observation 后停止，不会假装计算成功：${message.content}`);
+      }
+      return callTool("calculator", {});
+    },
   });
 
+  const budget = new Budget({
+    maxSteps: 3,
+    maxCostUsd: 0.01,
+    maxWallMs: 5_000,
+  });
+  const result = await runAgent({
+    provider,
+    registry,
+    budget,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: "计算一个表达式，但我不提供表达式。" },
+    ],
+    tenantId: TENANT_ID,
+  });
+
+  console.log(`agent 结束状态: ${result.status}，步数: ${result.steps}`);
+  console.log(`回填给模型的 observation: ${findObservation(result.messages)}`);
+}
+
+async function main(): Promise<void> {
+  const traceId = randomUUID();
+  const tracer = new Tracer({ traceId, dir: TRACE_DIR });
   const registry = new ToolRegistry(tracer);
   for (const tool of builtinTools) registry.register(tool);
 
-  const provider = new MockProvider({ name: `mock-${scenario.id}`, script: scenario.script });
-  const budget = new Budget(
-    scenario.budget ?? { maxSteps: 6, maxCostUsd: 0.05, maxWallMs: 10_000 },
-  );
-
-  const messages: Message[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: scenario.question },
-  ];
+  const provider = new MockProvider({ name: "demo-mock", script: demoScript });
+  const budget = new Budget({
+    maxSteps: 8,
+    maxCostUsd: 0.05,
+    maxWallMs: 30_000,
+  });
 
   const result = await runAgent({
     provider,
     registry,
-    messages,
     budget,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: "请算一下 2 + 3 * 4，并告诉我退款政策。" },
+    ],
     tracer,
-    tenantId: scenario.tenantId ?? "tenant-a",
-    ...(scenario.idempotencyKey ? { idempotencyKey: scenario.idempotencyKey } : {}),
+    tenantId: TENANT_ID,
   });
 
   const tracePath = await tracer.flush();
-  return {
-    id: scenario.id,
-    title: scenario.title,
-    result,
-    tracePath,
-    expect: scenario.expect,
-    lesson: scenario.lesson,
-  };
-}
 
-/** 从工具观察结果里取出内容，模拟模型"读懂了 observation" */
-function observationSummary(result: RunResult): string {
-  const toolMessages = result.messages.filter((message) => message.role === "tool");
-  return toolMessages.map((message) => message.content).join(" | ");
-}
-
-function buildScenarios(): Scenario[] {
-  return [
-    // ── 1. 正常链路 ────────────────────────────────────────────────
-    {
-      id: "S1",
-      title: "正常链路：一次工具调用后收敛",
-      question: "请计算 2 + 3 * 4",
-      expect: "1 次工具调用、2 步、status=done",
-      lesson: "L5 编排 + L2 工具：模型只负责决定调用，执行和校验在 registry",
-      script: (req) => {
-        const last = lastMessage(req);
-        if (last?.role === "tool") {
-          return stop(`计算器结果是 ${last.content}，所以答案是 14。`);
-        }
-        return callTools([{ id: "call-calc", name: "calculator", args: { expression: "2 + 3 * 4" } }]);
-      },
-    },
-
-    // ── 2. 参数校验失败后自我修复 ──────────────────────────────────
-    {
-      id: "S2",
-      title: "参数非法：错误回填后模型自己修好",
-      question: "帮我算一下 12 * (3 + 1)",
-      expect: "第 1 次调用缺 expression 被拒，第 2 次带正确参数成功",
-      lesson: "L2 工具：校验失败返回 ok:false + validation_error，而不是抛异常打断整个 run",
-      script: (() => {
-        let attempts = 0;
-        return (req: LLMRequest) => {
-          const last = lastMessage(req);
-          if (last?.role === "tool" && last.content.includes("validation_error")) {
-            // 模型看到了具体错误，于是补上字段
-            return callTools([
-              { id: "call-fix", name: "calculator", args: { expression: "12 * (3 + 1)" } },
-            ]);
-          }
-          if (last?.role === "tool") {
-            return stop(`补上参数后成功：${last.content}`);
-          }
-          attempts += 1;
-          if (attempts === 1) {
-            return callTools([{ id: "call-bad", name: "calculator", args: {} }]);
-          }
-          return stop("不应该走到这里");
-        };
-      })(),
-    },
-
-    // ── 3. 死循环检测 ─────────────────────────────────────────────
-    {
-      id: "S3",
-      title: "死循环：同参数重复 3 次被拦截",
-      question: "帮我查一下退款政策",
-      expect: "status=loop_detected，在第 3 步停下",
-      lesson: "L5 编排：用动作签名（name + 稳定序列化的 args）判重，比 maxSteps 更早止损",
-      script: () =>
-        callTools([{ id: "call-loop", name: "search_docs", args: { query: "退款政策" } }]),
-    },
-
-    // ── 4a. 写操作缺少幂等键 ──────────────────────────────────────
-    {
-      id: "S4a",
-      title: "写操作缺少幂等键：直接拒绝执行",
-      question: "帮我建一个工单",
-      expect: "policy_error：requires ctx.idempotencyKey",
-      lesson: "L2 工具：isWrite 的工具在 registry 层就要求幂等键，handler 永远不会被调用",
-      script: (req) => {
-        const last = lastMessage(req);
-        if (last?.role === "tool") {
-          // 模型看到"缺少幂等键"，正确做法是停下来说明原因，而不是原样重试
-          return stop(`无法创建工单：调用方没有提供幂等键（${last.content.slice(0, 80)}），已阻止潜在的重复建单。`);
-        }
-        return callTools([
-          { id: "call-ticket-1", name: "create_ticket", args: { title: "登录页 500", priority: "high", confirm: true } },
-        ]);
-      },
-    },
-
-    // ── 4b. 幂等键 + 确认 → 建单成功 ─────────────────────────────
-    {
-      id: "S4b",
-      title: "写操作：幂等键 + confirm=true 才落库",
-      question: "帮我建一个工单",
-      expect: "TICKET-0001，idempotentReplay=false",
-      lesson: "L2 工具：confirm 由用户意图决定、幂等键由调用方决定，都不许模型自己编",
-      script: (req) => {
-        const last = lastMessage(req);
-        if (last?.role === "tool") return stop(`建单结果：${last.content}`);
-        return callTools([
-          { id: "call-ticket-2", name: "create_ticket", args: { title: "登录页 500", priority: "high", confirm: true } },
-        ]);
-      },
-      idempotencyKey: "ticket-req-001",
-    },
-
-    // ── 4c. 同一个幂等键重放 ─────────────────────────────────────
-    {
-      id: "S4c",
-      title: "同一个幂等键重放：返回同一张单",
-      question: "重新帮我建一个工单",
-      expect: "同一个 ticketId，idempotentReplay=true",
-      lesson: "L2 工具：超时重试/用户重复点击都不会产生第二张工单",
-      script: (req) => {
-        const last = lastMessage(req);
-        if (last?.role === "tool") return stop(`重放结果：${last.content}`);
-        return callTools([
-          { id: "call-ticket-3", name: "create_ticket", args: { title: "登录页 500", priority: "high", confirm: true } },
-        ]);
-      },
-      idempotencyKey: "ticket-req-001",
-    },
-
-    // ── 5. 预算耗尽 ───────────────────────────────────────────────
-    {
-      id: "S5",
-      title: "预算耗尽：花超之前停下，返回可解释状态",
-      question: "把这件事一直做下去",
-      expect: "status=budget，步数停在预算边界",
-      lesson: "L0 横切：预算不是 try/catch，是每一步开始前的准入检查",
-      budget: { maxSteps: 2, maxCostUsd: 1, maxWallMs: 10_000 },
-      script: (() => {
-        let n = 0;
-        return () => {
-          n += 1;
-          // 每次参数不同，避开死循环检测，专门验证步数预算
-          return callTools([
-            { id: `call-budget-${n}`, name: "calculator", args: { expression: `1 + ${n}` } },
-          ]);
-        };
-      })(),
-    },
-  ];
-}
-
-function pad(value: string, width: number): string {
-  return value.length >= width ? value : value + " ".repeat(width - value.length);
-}
-
-function money(usd: number): string {
-  return `$${usd.toFixed(6)}`;
-}
-
-async function main(): Promise<void> {
-  const scenarios = buildScenarios();
-  const outcomes: ScenarioOutcome[] = [];
-
-  for (const scenario of scenarios) {
-    const outcome = await runScenario(scenario);
-    outcomes.push(outcome);
-
-    const { result } = outcome;
-    console.log("");
-    console.log(`── ${scenario.id} ${scenario.title}`);
-    console.log(`   问题   : ${scenario.question}`);
-    console.log(`   预期   : ${scenario.expect}`);
-    console.log(`   状态   : ${result.status}（步数 ${result.steps}，成本 ${money(result.usage.costUsd)}）`);
-    console.log(`   最终   : ${result.finalContent.slice(0, 200)}`);
-    const observation = observationSummary(result);
-    if (observation.length > 0) {
-      console.log(`   观察   : ${observation.slice(0, 300)}`);
-    }
-    console.log(`   机制   : ${scenario.lesson}`);
-    console.log(`   trace  : ${outcome.tracePath}`);
-  }
+  console.log("=== 1) 每步动作与耗时 ===");
+  for (const line of groupSteps(result, tracer)) console.log(line);
 
   console.log("");
-  console.log("── 汇总");
-  console.log(`${pad("场景", 6)}${pad("状态", 16)}${pad("步数", 6)}${pad("成本", 14)}预期`);
-  for (const outcome of outcomes) {
-    const { result } = outcome;
-    console.log(
-      `${pad(outcome.id, 6)}${pad(result.status, 16)}${pad(String(result.steps), 6)}${pad(money(result.usage.costUsd), 14)}${outcome.expect}`,
-    );
-  }
+  console.log("=== 2) 最终答案 ===");
+  console.log(result.finalContent);
 
-  const totalCost = outcomes.reduce((sum, outcome) => sum + outcome.result.usage.costUsd, 0);
-  const failed = outcomes.filter((outcome) => outcome.result.status === "error");
   console.log("");
-  console.log(`总成本 ${money(totalCost)}，trace 目录 ${TRACE_DIR}`);
-  if (failed.length > 0) {
-    console.log(`有 ${failed.length} 个场景以 error 结束，请检查上面的输出。`);
+  console.log("=== 3) budget 快照 ===");
+  console.log(JSON.stringify(budget.snapshot(), null, 2));
+
+  console.log("");
+  console.log("=== 4) tracer.summary() ===");
+  console.log(JSON.stringify(tracer.summary(), null, 2));
+
+  console.log("");
+  console.log("=== 5) trace 文件 ===");
+  console.log(tracePath);
+
+  if (result.status !== "done") {
+    console.log(`\n主流程没有正常结束: ${result.status}`);
     process.exitCode = 1;
-  } else {
-    console.log("全部场景按预期结束（done / loop_detected / policy 拒绝 / budget 都是预期状态）。");
   }
+
+  await runFailurePath();
 }
 
-main().catch((err: unknown) => {
-  console.error(`demo 运行失败: ${err instanceof Error ? err.message : String(err)}`);
+main().catch((error: unknown) => {
+  console.error(`demo 运行失败: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
 });

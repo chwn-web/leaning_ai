@@ -1,6 +1,6 @@
 {"id":"case-001","input":"退款政策是什么？","expected":"标准版用户可在付款后 7 天内申请退款。","tags":["happy"]}
 {"id":"case-002","input":"请计算 2 + 3 * 4 等于多少？","expected":"14","tags":["happy"]}
-{"id":"case-003","input":"请计算下面的表达式，但我不提供表达式。","expected":"","tags":["tool_error"]}
+{"id":"case-003","input":"请计算下面的表达式，但我不提供表达式。","expected":"请补充要计算的表达式","tags":["missing_info"]}
 {"id":"case-004","input":"发票怎么开？","expected":"在控制台的费用中心申请发票。","tags":["happy"]}
 {"id":"case-005","input":"帮我处理一下。","expected":"请补充具体要处理的事项。","tags":["missing_info"]}
 {"id":"case-006","input":"帮我创建一个工单，但先不要确认。","expected":"需要用户明确确认后才能创建工单。","tags":["policy"]}
@@ -8,3 +8,4 @@
 {"id":"case-008","input":"API 限流规则是什么？","expected":"默认每个 API Key 每分钟 600 次请求。","tags":["happy"]}
 {"id":"case-009","input":"数据能导出多久？","expected":"导出文件保留 7 天。","tags":["happy"]}
 {"id":"case-010","input":"计算 (7 - 2) * 3","expected":"15","tags":["happy"]}
+{"id":"case-011","input":"请计算 2 + * 3","expected":"","tags":["tool_error"]}
