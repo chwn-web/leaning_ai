@@ -10,13 +10,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 
 const ROOT = resolve(process.cwd());
-const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "data"]);
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "data", ".tmp-tools", ".tmp-models", ".tmp-hf", ".tmp-media", ".tmp-chrome"]);
 const verbose = process.argv.includes("--verbose");
 
 /** 递归收集 .md 文件 */
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
     if (SKIP_DIRS.has(entry)) continue;
+    // 隐藏目录（.tmp-*/.venv 等）里通常是临时工具或第三方包，不校验
+    if (entry.startsWith(".") && entry !== ".") continue;
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) walk(full, out);

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Agent 工程师 · 学习框架总纲</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --card: #ffffff; --ink: #1f2328; --muted: #6b7280;
+    --line: #e5e7eb; --brand: #2563eb; --brand-soft: #eff4ff;
+    --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+    --l6: #9334e6; --l5: #ea4335; --l4: #f9ab00; --l3: #34a853;
+    --l2: #4285f4; --l1: #0ea5e9; --l0: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.7 -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .3px; }
+  .sub { color: var(--muted); font-size: 14px; }
+  h2 { font-size: 18px; margin: 40px 0 14px; padding-left: 10px; border-left: 4px solid var(--brand); }
+  h3 { font-size: 15px; margin: 22px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .grid5 { grid-template-columns: repeat(2, 1fr); } }
+  .pillar { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; position: relative; overflow: hidden; }
+  .pillar::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; }
+  .pillar:nth-child(1)::before { background: var(--l2); }
+  .pillar:nth-child(2)::before { background: var(--l3); }
+  .pillar:nth-child(3)::before { background: var(--l4); }
+  .pillar:nth-child(4)::before { background: var(--l5); }
+  .pillar:nth-child(5)::before { background: var(--l6); }
+  .pillar b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .pillar span { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
+  /* 时间轴 */
+  .timeline { display: grid; grid-template-columns: 14fr 7fr 6fr 6fr 3fr 16fr; gap: 6px; margin-top: 6px; }
+  .seg { border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 12px; line-height: 1.4; min-height: 62px; }
+  .seg small { display: block; opacity: .85; font-size: 11px; }
+  @media (max-width: 860px) { .timeline { grid-template-columns: 1fr 1fr; } }
+
+  /* 七层 */
+  .layers { display: flex; flex-direction: column; gap: 6px; }
+  .layer { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 12px;
+           background: var(--card); border: 1px solid var(--line); border-left-width: 6px; border-radius: 10px;
+           padding: 10px 14px; cursor: pointer; transition: .15s; }
+  .layer:hover { transform: translateX(3px); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  .layer .tag { font-weight: 700; font-size: 13px; }
+  .layer .desc { font-size: 13px; color: var(--muted); }
+  .layer .detail { grid-column: 1 / -1; display: none; font-size: 13px; color: #374151;
+                   border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 8px; }
+  .layer.open .detail { display: block; }
+
+  /* 考纲 */
+  .mods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .mods { grid-template-columns: 1fr; } }
+  .mod { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .mod h4 { margin: 0 0 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .mod h4 em { font-style: normal; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .mod ul { list-style: none; margin: 0; padding: 0; }
+  .mod li { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; font-size: 13px; line-height: 1.55; }
+  .mod li input { margin: 4px 0 0; accent-color: var(--ok); }
+  .mod li.done span { color: var(--muted); text-decoration: line-through; }
+
+  /* 进度 */
+  .bar { position: sticky; top: 0; z-index: 10; background: rgba(247,248,250,.92);
+         backdrop-filter: blur(6px); padding: 12px 0; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  .bar-inner { display: flex; align-items: center; gap: 14px; max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  .progress { flex: 1; height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--l2), var(--ok)); transition: width .25s; }
+  .bar b { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .bar button { font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--line);
+                border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .bar button:hover { color: var(--bad); border-color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { background: #fafafa; font-weight: 600; color: #374151; }
+  .note { background: var(--brand-soft); border: 1px solid #dbeafe; border-radius: 10px; padding: 12px 14px; font-size: 13.5px; }
+  .kbd { font-family: ui-monospace, Consolas, monospace; background: #f3f4f6; border: 1px solid var(--line);
+         border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  footer { margin-top: 50px; color: var(--muted); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="bar-inner">
+    <b>考纲进度</b>
+    <div class="progress"><i id="pbar"></i></div>
+    <b id="ptext">0 / 0</b>
+    <button id="reset">清空</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>AI Agent 工程师 · 学习框架总纲</h1>
+    <div class="sub">
+      2026-11-09 制定 ｜ 24 周核心学习 + 16 周求职冲刺 ｜ 目标：2027 年内拿到 Agent / LLM 应用工程师 offer<br />
+      地图不是课本：这里回答「学什么、到什么程度、拿什么证明」，细节在 <span class="kbd">kb/</span> 和 <span class="kbd">plan/</span>。
+    </div>
+  </header>
+
+  <div class="note">
+    <b>一句话框架</b>：能力模型告诉你差在哪 → 七层结构告诉你学什么 → 24 周节奏告诉你什么时候学 →
+    项目阶梯告诉你拿什么证明 → 求职闭环把它换成 offer。面试面崩了，回到第一格重新校准。
+  </div>
+
+  <h2>① 五根支柱</h2>
+  <div class="grid5">
+    <div class="pillar"><b>能力模型</b><span>7 维雷达<br />起点 1,1,0,0,1,3,2<br />目标 3,3,3,3,3,4,3</span></div>
+    <div class="pillar"><b>知识结构</b><span>L0–L6 七层<br />按层学答的是设计<br />按框架学答的是 API</span></div>
+    <div class="pillar"><b>节奏</b><span>24 周 / 5 阶段<br />每周约 12h<br />W8、W14 降载</span></div>
+    <div class="pillar"><b>项目证据</b><span>P0–P4 阶梯<br />每个项目四件套<br />必须踩 1 个真坑</span></div>
+    <div class="pillar"><b>求职闭环</b><span>3 月中试水<br />4 月底主攻<br />面完 24h 内复盘</span></div>
+  </div>
+
+  <h2>② 24 周节奏</h2>
+  <div class="timeline">
+    <div class="seg" style="background:#6b7280"><b>阶段 0 摸底与基建</b><small>W1–W2 · 11/09–11/22 · P0 多模型网关</small></div>
+    <div class="seg" style="background:#4285f4"><b>阶段 1 LLM 应用 + 单 Agent</b><small>W3–W9 · 11/23–01/10 · P1 + 30 条评测</small></div>
+    <div class="seg" style="background:#34a853"><b>阶段 2 RAG 与评估</b><small>W10–W15 · 01/11–02/21 · P2</small></div>
+    <div class="seg" style="background:#f9ab00"><b>阶段 3 工程化 + 多智能体</b><small>W16–W21 · 02/22–04/04 · P3</small></div>
+    <div class="seg" style="background:#ea4335"><b>阶段 4 产品化</b><small>W22–W24 · P4</small></div>
+    <div class="seg" style="background:#9334e6"><b>阶段 5 求职冲刺</b><small>W25–W40 · 04/26–08 · 投递 / 面试 / 复盘</small></div>
+  </div>
+  <p style="font-size:13px;color:#6b7280;margin-top:10px">
+    里程碑：M1 11-22 能讲七层 → M2 01-10 单 Agent + 评测 → M3 02-21 RAG 闭环 → M4 04-04 平台 + 开源 →
+    <b>M5 04-25 L3 达成（可投简历）</b> → M6 08-08 offer。每周 = 周一至周三晚各 2h + 周六 4h + 周日 2h。
+  </p>
+
+  <h2>③ 七层结构（点每一层看要点）</h2>
+  <div class="layers" id="layers">
+    <div class="layer" style="border-left-color:var(--l6)">
+      <div class="tag" style="color:var(--l6)">L6 体验层</div>
+      <div class="desc">流式渲染、中断、人工审批、错误态</div>
+      <div class="detail">要点：首字延迟是体验第一指标 ｜ 流式过程要能让用户中断 ｜ 写操作必须人工确认 ｜ <b>幂等键从这里传下去，不能让模型自己编</b> ｜ 失败态要给出可执行的下一步。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l5)">
+      <div class="tag" style="color:var(--l5)">L5 编排层</div>
+      <div class="desc">循环、工具选择、预算、多 Agent</div>
+      <div class="detail">要点：模型→工具→观察→再模型的最小循环 ｜ 死循环检测靠<b>动作签名</b>不是步数 ｜ 步数/成本/墙钟三重预算<b>前置</b>检查 ｜ 单 Agent 工具数 2–5，>10 明显不稳 ｜ 多 Agent 协调失败率约 79%，2–3 个 specialist 是甜点。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l4)">
+      <div class="tag" style="color:var(--l4)">L4 上下文层</div>
+      <div class="desc">提示分层、压缩、记忆、检索拼接</div>
+      <div class="detail">要点：系统提示/工具/历史/检索/输入的预算与丢弃顺序 ｜ 前缀稳定才能吃 prompt cache ｜ 压缩会腐化（越压越丢约束） ｜ working notes 省 40–60% token ｜ <b>权限过滤必须下推到 L1</b>。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l3)">
+      <div class="tag" style="color:var(--l3)">L3 模型层</div>
+      <div class="desc">采样、结构化输出、FC 协议、降级</div>
+      <div class="detail">要点：token 与成本能口算 ｜ temp=0 也不可复现的四个原因 ｜ <b>严格 JSON 只保语法不保语义</b> ｜ 解析失败要多级降级 ｜ 换小模型/微调/加规则的判断依据。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l2)">
+      <div class="tag" style="color:var(--l2)">L2 工具层</div>
+      <div class="desc">schema、校验、错误分类、幂等、MCP</div>
+      <div class="detail">要点：工具失败返回 <b>ok:false 而不是抛异常</b> ｜ 参数一律当不可信输入 ｜ 幂等键由调用方传 ｜ 超时≠没发生 ｜ MCP = JSON-RPC 2.0 + OAuth2.1 + 禁 token passthrough ｜ 与 Function Calling 是叠加不是替代。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l1)">
+      <div class="tag" style="color:var(--l1)">L1 数据层</div>
+      <div class="desc">解析、切分、embedding、检索、重排</div>
+      <div class="detail">要点：<b>召回是天花板</b>，先量 recall@k ｜ BM25 救精确词、向量救语义、rerank 救排序 ｜ 权限 ACL 在索引侧预过滤（后过滤会滤空） ｜ 换 embedding 必须全量重灌 ｜ 无答案识别比硬编答案重要。</div>
+    </div>
+    <div class="layer" style="border-left-color:var(--l0)">
+      <div class="tag" style="color:var(--l0)">L0 横切</div>
+      <div class="desc">评测、trace、成本、安全</div>
+      <div class="detail">要点：评测集来源要写清 ｜ pass@k 看能力、<b>pass^k 看生产稳定性</b> ｜ 20 条 95% 的置信区间是 76%–99% ｜ 判定器自己也会写错（假绿） ｜ lethal trifecta 砍一条即降险 ｜ 重试风暴与成本失控的熔断。</div>
+    </div>
+  </div>
+
+  <h2>④ 考纲：13 个知识模块（勾选即进度，存在本机）</h2>
+  <div class="mods" id="mods"></div>
+
+  <h2>⑤ 工程能力清单</h2>
+  <table>
+    <thead><tr><th style="width:56px">编号</th><th>验收项（对照 projects/_template 的 7 条）</th></tr></thead>
+    <tbody>
+      <tr><td>E01</td><td>不装任何依赖就能跑起 Agent，且能讲清每一行的理由</td></tr>
+      <tr><td>E02</td><td>工具注册表：schema 校验 + 超时 + 重试 + 错误分类</td></tr>
+      <tr><td>E03</td><td>预算前置检查（步数 / 成本 / 墙钟），花钱之前就停</td></tr>
+      <tr><td>E04</td><td>动作签名防死循环</td></tr>
+      <tr><td>E05</td><td>trace 落盘 + summary，任何一次运行都能复盘</td></tr>
+      <tr><td>E06</td><td>评测 runner：pass@k / pass^k / 置信区间 / 失败分布</td></tr>
+      <tr><td>E07</td><td>结构化输出解析的多级降级</td></tr>
+      <tr><td>E08</td><td>流式输出 + 可中断</td></tr>
+      <tr><td>E09</td><td>幂等写操作 + 确认流程</td></tr>
+      <tr><td>E10</td><td>自己写的 MCP server 能被 host 调用</td></tr>
+      <tr><td>E11</td><td>权限过滤落在检索侧</td></tr>
+      <tr><td>E12</td><td>成本 / 延迟面板（最简版也行）</td></tr>
+    </tbody>
+  </table>
+
+  <h2>⑥ 面试要点：答题三层 + 16 个真坑</h2>
+  <div class="card">
+    <p style="margin-top:0"><b>每一题都要答三层</b>：① 怎么衡量 → ② 为什么不用另一个方案 → ③ 线上坏了怎么定位。<br />
+      只答第一层 = 背答案，面试官下一句就会把你问穿。</p>
+    <p style="margin-bottom:0">46 道高价值题按周挂载在 <span class="kbd">plan/05-高频题库.md</span>；P1–P16 是 16 个真实生产坑
+      （重试风暴、权限后过滤、参数幻觉、流式与工具冲突、上下文旅程…），<b>每个项目必须主动踩 1 个并写进 README</b>。</p>
+  </div>
+
+  <h2>⑦ 每周日自检</h2>
+  <div class="card">
+    <ul style="margin:0;padding-left:20px;font-size:13.5px">
+      <li>本周产出物提交了吗（代码 / 笔记 / 评测结果）</li>
+      <li>本周新学的东西，能用自己的项目举一个例子吗</li>
+      <li>随机抽 3 道题自述三层，🟡 以上的记进下周</li>
+      <li>雷达哪一维动了？没动就是没学到</li>
+    </ul>
+  </div>
+
+  <footer>
+    配套文档：plan/06-框架总纲.md（本文的 Markdown 版）· plan/00-总计划 · plan/01-周计划 · plan/02-项目规格 ·
+    plan/03-求职冲刺 · plan/05-高频题库 · kb/01-全景图 · kb/02-概念 · projects/_template
+  </footer>
+</div>
+
+<script>
+const MODULES = [
+  { id: "K01", name: "LLM 基础与成本", points: [
+    "一次请求的 token 怎么算，成本公式能口算（输入价 ≠ 输出价）",
+    "采样参数各自影响什么，什么时候调",
+    "为什么 temperature=0 也不能保证完全可复现（4 个原因）",
+    "KV cache 占用 ≈ 2×batch×layers×hidden×seq×字节，GQA 按 KV 头缩",
+    "长上下文为什么不能替代检索（lost-in-middle / context rot）",
+    "什么时候换小模型、上微调、加规则",
+  ]},
+  { id: "K02", name: "上下文工程", points: [
+    "窗口里每一段的预算分配与丢弃顺序",
+    "前缀稳定才能吃 prompt cache，什么改动让它全失效",
+    "压缩的三种触发时机与压缩腐化",
+    "working notes / 结构化记忆省 40–60% token",
+    "多轮里用户改主意：覆盖而非追加",
+  ]},
+  { id: "K03", name: "结构化输出与工具调用", points: [
+    "Function calling 协议：tool_call_id 怎么串",
+    "严格 JSON 只保语法不保语义",
+    "参数幻觉三种表现 + 校验层兜底",
+    "流式与工具调用冲突（参数被当正文流出去）",
+    "解析失败降级链：严格 → 宽松 → 修复提示 → 人审",
+  ]},
+  { id: "K04", name: "工具设计与 MCP", points: [
+    "schema 怎么写才不容易被误调用",
+    "工具失败返回 ok:false 而不是抛异常",
+    "幂等键必须由调用方传，不能让模型生成",
+    "写操作三件套：确认、幂等、超时≠未发生",
+    "MCP = JSON-RPC 2.0，tools/resources/prompts，stdio vs Streamable HTTP",
+    "MCP 安全：OAuth 2.1、audience 绑定、禁 token passthrough、防 tool poisoning",
+    "MCP 与 Function Calling 是叠加不是替代",
+  ]},
+  { id: "K05", name: "Agent 架构", points: [
+    "单 Agent 循环的最小状态机",
+    "死循环检测靠动作签名而不是步数",
+    "什么时候用工作流（DAG）而不是 Agent",
+    "单 Agent 工具数 2–5，>10 不稳",
+    "多 Agent 协调失败率约 79%，2–3 个是甜点",
+    "handoff 失真：交接摘要丢约束",
+  ]},
+  { id: "K06", name: "记忆", points: [
+    "短期 / 长期 / 情节三种记忆的边界",
+    "写入策略：何时写、写什么、谁淘汰",
+    "记忆污染的危害与可删除、可溯源设计",
+    "用户偏好与事实知识要分库存",
+  ]},
+  { id: "K07", name: "RAG 全链路", points: [
+    "解析、切分、元数据（来源/权限/版本）",
+    "召回是天花板：先量 recall@k 再谈 rerank",
+    "混合检索（BM25 + 向量）+ 重排",
+    "权限过滤下推到索引侧，后过滤会滤空",
+    "换 embedding 必须全量重灌",
+    "无答案识别比硬编答案重要",
+  ]},
+  { id: "K08", name: "检索进阶", points: [
+    "chunk 大小/重叠要跑 A/B 而不是拍脑袋",
+    "query 改写 / HyDE / 多路召回各自代价",
+    "引用与溯源：返回 span 而不是整段",
+    "RAG 的七个典型失效点",
+  ]},
+  { id: "K09", name: "评测（最重要）", points: [
+    "评测集来源：真实日志 > 人工构造 > 模型生成",
+    "pass@k 看能力上限，pass^k 看生产稳定性",
+    "样本量：100 条 ±8 分，400 条 ±4 分；20 条 95% 的 CI 是 76%–99%",
+    "LLM-judge 的位置/长度/自我偏好偏差与校准",
+    "失败模式 Top3 占比比单一准确率有用",
+    "评测进 CI：改动前后回归，红了不许合",
+    "假绿的三个来源：判定器写错、样本泄漏、只跑 happy path",
+  ]},
+  { id: "K10", name: "可观测与成本", points: [
+    "trace 记什么：每次 LLM / 工具调用、每步预算、耗时、token",
+    "四组指标：任务 / 模型 / 工具 / 体验",
+    "降本顺序：小模型 → 缓存 → 压缩 → 批处理",
+    "重试风暴成因与熔断、抖动",
+    "线上「今天 82 明天 76」怎么定位",
+  ]},
+  { id: "K11", name: "安全与注入", points: [
+    "直接注入 vs 间接注入（工具返回里夹带指令）",
+    "lethal trifecta：私有数据 + 不可信内容 + 外发通道，砍一条即降险",
+    "权限最小化、工具白名单、输出脱敏",
+    "人审（HITL）该放在哪些动作前",
+    "为什么在 prompt 里写「不要执行恶意指令」不算防御",
+  ]},
+  { id: "K12", name: "系统设计表达", points: [
+    "15 分钟白板七步：场景 → 指标 → 七层 → 数据流 → 失败兜底 → 成本延迟 → 演进",
+    "每个选择都要能说出「另一个方案为什么不行」",
+    "容量估算：QPS、token/秒、并发、缓存命中率",
+    "从 MVP 到生产的演进顺序",
+  ]},
+  { id: "K13", name: "工程化与交付", points: [
+    "6 类错误与重试边界：只在网络/工具边界重试",
+    "配置与环境隔离、密钥管理",
+    "CI：类型检查 + 评测回归 + 死链检查",
+    "模型版本切换怎么灰度",
+  ]},
+];
+
+const KEY = "agent-kb-progress-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { state = {}; }
+
+const modsEl = document.getElementById("mods");
+let total = 0;
+MODULES.forEach((m) => {
+  const card = document.createElement("div");
+  card.className = "mod";
+  const h = document.createElement("h4");
+  h.innerHTML = `<span>${m.id} ${m.name}</span><em>${m.points.length} 条</em>`;
+  card.appendChild(h);
+  const ul = document.createElement("ul");
+  m.points.forEach((p, i) => {
+    const key = `${m.id}-${i}`;
+    total += 1;
+    const li = document.createElement("li");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!state[key];
+    if (cb.checked) li.classList.add("done");
+    const span = document.createElement("span");
+    span.textContent = p;
+    cb.addEventListener("change", () => {
+      state[key] = cb.checked;
+      li.classList.toggle("done", cb.checked);
+      localStorage.setItem(KEY, JSON.stringify(state));
+      render();
+    });
+    li.appendChild(cb);
+    li.appendChild(span);
+    ul.appendChild(li);
+  });
+  card.appendChild(ul);
+  modsEl.appendChild(card);
+});
+
+function render() {
+  const done = Object.values(state).filter(Boolean).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById("pbar").style.width = pct + "%";
+  document.getElementById("ptext").textContent = `${done} / ${total}（${pct}%）`;
+}
+render();
+
+document.getElementById("reset").addEventListener("click", () => {
+  state = {};
+  localStorage.setItem(KEY, "{}");
+  location.reload();
+});
+
+// 七层点击展开
+document.querySelectorAll(".layer").forEach((el) => {
+  el.addEventListener("click", () => el.classList.toggle("open"));
+});
+</script>
+</body>
+</html>
