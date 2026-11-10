@@ -65,14 +65,16 @@ W25-40 投递与面试                   → offer
 │   ├── job-market-2027.md
 │   ├── interview-bank.md
 │   └── douyin-7694618490191453352-transcript.md
-├── notes/                 # 自评、周记、面试复盘、我的素材
+├── notes/                 # 自评、周记、面试复盘、我的素材、运维 SOP
 │   ├── 自评.md
 │   ├── 周记模板.md
 │   ├── 面试复盘.md
 │   ├── 我的素材.md
-│   └── 会话同步与备份.md
+│   ├── 会话同步与备份.md
+│   └── 换机与备份操作.md   # ★ 关机前/换机时照着做
 └── scripts/
-    └── check-links.mjs    # 知识库死链检查：node scripts/check-links.mjs
+    ├── check-links.mjs    # 知识库死链检查：node scripts/check-links.mjs
+    └── session-backup.ps1 # 一键备份全部会话到私有仓库
 ```
 
 **四个目录的分工**（别混用）：`plan/` 管节奏 ｜ `kb/` 管理解 ｜ `projects/` 管证据 ｜ `research/` 管出处。
