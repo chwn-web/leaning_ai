@@ -1,4 +1,9 @@
-﻿# 安装 dsh-session-cloud 插件到 DSH web profile（需要完整文件权限）
+﻿# 安装 dsh-session-cloud 插件到 DSH profile（需要完整文件权限）
+#
+# 注意：桌面版（DSH Tauri）实际使用的是 `profiles\tauri`，命令行 `dsh web` 用的是
+# `profiles\web`。装错了 profile 的表现是"重启后什么都看不到"。-- 2026-11-10 踩过。
+# 本机推荐直接用官方通道（它会自己写对 profile、还会 pnpm 装依赖）：
+#   plugin_manager install_bundle target=file:D:\TCL\leaning_AI_agent\plugins\session-cloud\dsh-plugin
 #
 # 做的事（每一步都可回滚）：
 #   1. 备份 profile 的 package.json → package.json.bak-session-cloud
@@ -9,7 +14,7 @@
 # 不做的事：不改 cordis.patch.yml（插件自带 dsh.bundle.patch，宿主启动时会自动合并）
 
 param(
-    [string]$ProfileDir = "C:\Users\issuser\.dsh\profiles\web",
+    [string]$ProfileDir = "C:\Users\issuser\.dsh\profiles\tauri",
     [string]$SourceDir  = (Join-Path $PSScriptRoot "dsh-plugin")
 )
 
