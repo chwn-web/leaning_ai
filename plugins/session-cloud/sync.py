@@ -35,10 +35,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# 配置与状态默认放在用户目录（而不是脚本旁边）：插件安装后脚本位于 node_modules，
+# 在那里写配置既不可靠也不该被 npm 清理。
+_default_home = Path(os.path.expanduser("~")) / ".dsh" / "session-anywhere"
 # 路径都可以用环境变量覆盖：自测（selftest.py）靠这个把读写引到临时目录，
 # 绝不碰真实的 ~/.dsh/sessions 与 state.json。
-CONFIG_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_CONFIG", str(HERE / "config.json")))
-STATE_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_STATE", str(HERE / "state.json")))
+CONFIG_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_CONFIG", str(_default_home / "config.json")))
+STATE_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_STATE", str(_default_home / "state.json")))
 SESSION_FILE = "session.v4.jsonl.zstd"
 # push 前要求会话文件静置这么久，避免把正在写的会话传上去
 QUIET_SECONDS = 30

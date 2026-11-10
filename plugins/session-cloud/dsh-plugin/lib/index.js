@@ -1,5 +1,5 @@
 /**
- * dsh-session-cloud — host half.
+ * dsh-session-anywhere — host half.
  *
  * Registers two JSON endpoints under `/session-cloud` that drive the existing
  * zero-dependency engine `session-cloud/sync.py`:
@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url'
 export const inject = ['webServer']
 
 /** Plugin id, mirroring the package name in `cordis.patch.yml`. */
-export const name = 'dsh-session-cloud'
+export const name = 'dsh-session-anywhere'
 
 /** Route prefix. Registered as a `prefix` route, so every sub-path lands here. */
 const ROUTE = '/session-cloud'
@@ -47,8 +47,8 @@ const log = {
     try {
       // ctx.logger is absent when this module is imported outside a plugin
       // fiber (tests, dry runs); console is the honest fallback.
-      if (error === undefined) console.warn(`[dsh-session-cloud] ${message}`)
-      else console.warn(`[dsh-session-cloud] ${message}`, error)
+      if (error === undefined) console.warn(`[dsh-session-anywhere] ${message}`)
+      else console.warn(`[dsh-session-anywhere] ${message}`, error)
     } catch { /* a broken console must not break the request path */ }
   },
 }
@@ -80,10 +80,11 @@ function engineCandidates() {
     }
   }
 
-  out.push(join(PKG_DIR, 'sync.py'))           // engine copied next to the package
+  // 包内自带引擎（发布版走这条）：<pkg>/engine/sync.py
+  out.push(join(PKG_DIR, 'engine', 'sync.py'))
+  out.push(join(PKG_DIR, 'sync.py'))           // 开发期：引擎就在包目录旁
   out.push(join(PKG_DIR, '..', 'sync.py'))     // <session-cloud>/dsh-plugin → <session-cloud>
   out.push(join(PKG_DIR, '..', '..', 'sync.py')) // defensive: nested install root
-  out.push('D:\\TCL\\leaning_AI_agent\\plugins\\session-cloud\\sync.py')
   return out.map(entry => toAbsolute(entry))
 }
 
@@ -150,8 +151,8 @@ function execCapture(file, args, options = {}) {
  */
 function execCaptureRedirected(file, args, options) {
   const stamp = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const outPath = join(tmpdir(), `dsh-session-cloud-${stamp}.out`)
-  const errPath = join(tmpdir(), `dsh-session-cloud-${stamp}.err`)
+  const outPath = join(tmpdir(), `dsh-session-anywhere-${stamp}.out`)
+  const errPath = join(tmpdir(), `dsh-session-anywhere-${stamp}.err`)
   let outFd
   let errFd
   try {
@@ -567,7 +568,7 @@ export function apply(ctx) {
     const register = () => webServer.register({ kind: 'prefix', path: ROUTE, handler })
     // ctx.effect ties the route to the fiber: unload/reload disposes it, which
     // also keeps a hot restart from tripping the duplicate-route guard.
-    if (typeof ctx.effect === 'function') ctx.effect(register, 'dsh-session-cloud: routes')
+    if (typeof ctx.effect === 'function') ctx.effect(register, 'dsh-session-anywhere: routes')
     else register()
     log.warn(`routes mounted at ${ROUTE} (state/mode/health)`)
   } catch (error) {

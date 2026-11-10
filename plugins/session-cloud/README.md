@@ -1,9 +1,27 @@
-# session-cloud —— 会话级「仅本机 / 云同步」
+# dsh-session-anywhere —— 会话级「仅本机 / 云同步」
 
 给 DSH 的每一条会话一个开关：**🖥 仅本机**（默认，一个字节都不出网）或 **☁ 云同步**（上传到你的私有 git 仓库，换电脑能接着聊）。
 
 - 设计稿：[DESIGN.md](DESIGN.md)（含状态机、云端布局、平台落点、安全红线、里程碑）
-- 现阶段：**v0.1a 引擎已可用并验证**（`sync.py`，零第三方依赖），UI 插件（输入框左下角的 chip）是下一步。
+- 发布用包：`dsh-plugin/`（npm 名 **`dsh-session-anywhere`**，含 `engine/sync.py`、LICENSE、icon、发布级 README）
+- 现阶段：**v0.1 引擎 + UI 插件都已跑通**（宿主端点 `/session-cloud/{health,state,mode}` 实测 200，输入框左下角出现 chip）
+
+> 为什么改名：npm 上 `dsh-session-cloud` 已被占用（v0.1.7，全库 E2E 镜像）。我们做的是**逐会话选择 + 零服务端 git 后端**，定位不同。
+
+## 安装（桌面版）
+
+桌面版真正用的是 `~/.dsh/profiles/**tauri**`（`web` 是命令行 `dsh web` 用的，装错那里看不到 chip）。
+
+```powershell
+# 推荐：走官方通道
+#   plugin_manager install_bundle  target = file:D:\TCL\leaning_AI_agent\plugins\session-cloud\dsh-plugin
+# 手工等价操作（pnpm 不可用时）：
+#   1) 拷贝 dsh-plugin → <profile>\node_modules\dsh-session-anywhere
+#   2) 把 "dsh-session-anywhere" 加进 <profile>\package.json 的 dsh.profile.bundles
+#   3) 重启 DSH
+```
+
+自检：`Invoke-RestMethod http://127.0.0.1:3080/session-cloud/health`
 
 ## 为什么不是"现成插件"
 

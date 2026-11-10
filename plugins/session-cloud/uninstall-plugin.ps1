@@ -1,8 +1,8 @@
-﻿# 卸载 dsh-session-cloud 插件（回滚安装）
+﻿# 卸载 dsh-session-anywhere 插件（回滚安装）
 #
 # 做的事：
-#   1. 从 profile package.json 的 dsh.profile.bundles 移除 "dsh-session-cloud"
-#   2. 删除 <profile>/node_modules/dsh-session-cloud
+#   1. 从 profile package.json 的 dsh.profile.bundles 移除 "dsh-session-anywhere"
+#   2. 删除 <profile>/node_modules/dsh-session-anywhere
 #   3. 提示重启
 #
 # 如果 package.json 被改坏导致 DSH 起不来，直接用它旁边的备份恢复：
@@ -13,7 +13,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$pkgName = "dsh-session-cloud"
+$pkgName = "dsh-session-anywhere"
 $profilePkg = Join-Path $ProfileDir "package.json"
 
 if (Test-Path $profilePkg) {

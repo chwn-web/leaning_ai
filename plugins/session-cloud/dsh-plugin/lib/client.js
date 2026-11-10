@@ -1,5 +1,5 @@
 /**
- * dsh-session-cloud — client half.
+ * dsh-session-anywhere — client half.
  *
  * Loaded by the web shell as a lazy CJS bundle: this file only registers a
  * factory with `window.__ModuleLoader__.load`, and the shell materialises it
@@ -13,7 +13,7 @@
  * standard prop, so the chip is per-conversation without touching a service.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-session-cloud',
+  id: 'dsh-session-anywhere',
   factory: (require) => {
     var module = { exports: {} }; var exports = module.exports;
 
@@ -442,7 +442,7 @@ window.__ModuleLoader__.load({
         ])
       } catch (err) {
         // A render-time failure must never blank the composer: drop the chip.
-        try { console.warn('[dsh-session-cloud] render failed', err) } catch (e) { /* noop */ }
+        try { console.warn('[dsh-session-anywhere] render failed', err) } catch (e) { /* noop */ }
         return null
       }
     }
@@ -454,7 +454,7 @@ window.__ModuleLoader__.load({
     exports.apply = function apply(ctx) {
       try {
         if (!ctx || !ctx.slots || typeof ctx.slots.register !== 'function') {
-          try { console.warn('[dsh-session-cloud] slots service is unavailable — chip not registered') } catch (e) { /* noop */ }
+          try { console.warn('[dsh-session-anywhere] slots service is unavailable — chip not registered') } catch (e) { /* noop */ }
           return
         }
         // `inject` defers until the conversation package declares the slot, so
@@ -468,7 +468,7 @@ window.__ModuleLoader__.load({
           }, SessionCloudChip)
         })
       } catch (err) {
-        try { console.warn('[dsh-session-cloud] slot registration failed', err) } catch (e) { /* noop */ }
+        try { console.warn('[dsh-session-anywhere] slot registration failed', err) } catch (e) { /* noop */ }
       }
     }
 

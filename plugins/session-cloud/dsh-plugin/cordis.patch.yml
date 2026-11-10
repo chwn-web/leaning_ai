@@ -1,4 +1,4 @@
-# dsh-session-cloud bundle patch.
+# dsh-session-anywhere bundle patch.
 #
 # A profile bundle's substance is this file: the host boot applies it over the
 # empty root, so one `insert` row mounts the plugin with its own config.
@@ -6,4 +6,4 @@
 # stay equal to the package name (and to the id in lib/client.js).
 - insert:
     - id: session-cloud
-      name: 'dsh-session-cloud'
+      name: 'dsh-session-anywhere'

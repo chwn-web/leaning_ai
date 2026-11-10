@@ -1,4 +1,4 @@
-﻿# 安装 dsh-session-cloud 插件到 DSH profile（需要完整文件权限）
+﻿# 安装 dsh-session-anywhere 插件到 DSH profile（需要完整文件权限）
 #
 # 注意：桌面版（DSH Tauri）实际使用的是 `profiles\tauri`，命令行 `dsh web` 用的是
 # `profiles\web`。装错了 profile 的表现是"重启后什么都看不到"。-- 2026-11-10 踩过。
@@ -7,8 +7,8 @@
 #
 # 做的事（每一步都可回滚）：
 #   1. 备份 profile 的 package.json → package.json.bak-session-cloud
-#   2. 把 dsh-plugin/ 拷到 <profile>/node_modules/dsh-session-cloud
-#   3. 把 "dsh-session-cloud" 追加到 package.json 的 dsh.profile.bundles
+#   2. 把 dsh-plugin/ 拷到 <profile>/node_modules/dsh-session-anywhere
+#   3. 把 "dsh-session-anywhere" 追加到 package.json 的 dsh.profile.bundles
 #   4. 打印"重启才生效"的提示
 #
 # 不做的事：不改 cordis.patch.yml（插件自带 dsh.bundle.patch，宿主启动时会自动合并）
@@ -19,7 +19,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$pkgName = "dsh-session-cloud"
+$pkgName = "dsh-session-anywhere"
 
 if (-not (Test-Path (Join-Path $SourceDir "package.json"))) {
     throw "找不到插件源：$SourceDir\package.json"
