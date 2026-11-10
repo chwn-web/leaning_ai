@@ -397,9 +397,9 @@ function handleState(url, res) {
     ok: true,
     sessionId,
     found: row !== undefined,
-    // The engine defaults an un-indexed session to "local" (sync.py:177), so
-    // reporting "local" here is the engine's own answer, not a guess.
-    mode: row !== undefined && row.mode === 'cloud' ? 'cloud' : 'local',
+    // An un-indexed session has no recorded mode. Report "unknown" instead of
+    // guessing "local": a wrong "仅本机" badge is worse than an honest "⚠ 未知".
+    mode: row === undefined ? 'unknown' : (row.mode === 'cloud' ? 'cloud' : 'local'),
     syncedAt: row !== undefined ? (row.syncedAt ?? null) : null,
     size: row !== undefined ? (row.size ?? null) : null,
     modified: row !== undefined ? (row.modified ?? null) : null,
@@ -438,7 +438,21 @@ async function handleMode(req, res) {
     return
   }
 
-  const { stdout, engine, launcher } = runSync(['mode', '--session', sessionId, '--to', mode])
+  let stdout
+  let engine
+  let launcher
+  try {
+    ({ stdout, engine, launcher } = runSync(['mode', '--session', sessionId, '--to', mode]))
+  } catch (error) {
+    const text = describeError(error)
+    // 「本机没有这条会话」是调用方传错了 id，属客户端错误 —— 回 404 而不是 500，
+    // 否则监控里会把用户手滑记成服务端故障。
+    if (text.includes('没有匹配的会话')) {
+      sendJson(res, 404, { ok: false, error: text })
+      return
+    }
+    throw error
+  }
 
   // Re-read the state file through the engine so the reply reports what was
   // actually persisted, not what we asked for.

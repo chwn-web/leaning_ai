@@ -86,13 +86,14 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /** Normalise the wire mode to the two chip labels. */
+    /** Normalise the wire mode. `unknown` = 引擎里没有这条会话的记录，别硬说成"仅本机"。 */
     function normaliseMode(value) {
-      return value === 'cloud' ? 'cloud' : 'local'
+      if (value === 'cloud' || value === 'local') return value
+      return 'unknown'
     }
 
     function chipLabel(view) {
-      if (view.phase === 'error') return '⚠ 未知'
+      if (view.phase === 'error' || view.mode === 'unknown') return '⚠ 未知'
       if (view.phase !== 'ready') return '… 读取中'
       return view.mode === 'cloud' ? '☁ 云同步' : '🖥 仅本机'
     }
@@ -100,13 +101,14 @@ window.__ModuleLoader__.load({
     function chipTitle(view) {
       if (view.phase === 'error') return '同步引擎不可用：' + view.error
       if (view.phase !== 'ready') return '正在读取会话同步状态…'
+      if (view.mode === 'unknown') return '这条会话在同步引擎里还没有记录（点一下可设为云同步或仅本机）'
       return view.mode === 'cloud'
         ? '这条会话会进入云端自动备份（点击切换）'
         : '这条会话只留在本机（点击切换）'
     }
 
     function chipTone(view, hover) {
-      if (view.phase === 'error') {
+      if (view.phase === 'error' || (view.phase === 'ready' && view.mode === 'unknown')) {
         return { background: TONE.warnBg, border: '1px solid ' + TONE.warnBorder, color: TONE.warnText }
       }
       if (view.phase === 'ready' && view.mode === 'cloud') {
