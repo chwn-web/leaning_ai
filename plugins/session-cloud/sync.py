@@ -35,8 +35,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CONFIG_PATH = HERE / "config.json"
-STATE_PATH = HERE / "state.json"
+# 路径都可以用环境变量覆盖：自测（selftest.py）靠这个把读写引到临时目录，
+# 绝不碰真实的 ~/.dsh/sessions 与 state.json。
+CONFIG_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_CONFIG", str(HERE / "config.json")))
+STATE_PATH = Path(os.environ.get("DSH_SESSION_CLOUD_STATE", str(HERE / "state.json")))
 SESSION_FILE = "session.v4.jsonl.zstd"
 # push 前要求会话文件静置这么久，避免把正在写的会话传上去
 QUIET_SECONDS = 30
@@ -45,7 +47,13 @@ QUIET_SECONDS = 30
 def load_json(path: Path, default):
     if not path.exists():
         return default
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as err:
+        # state.json / config.json 被写坏（比如 BOM、半截写入）不应该让整个命令崩掉：
+        # 退回默认值并告警，比 traceback 有用。
+        print(f"警告：{path.name} 无法解析（{err}），已按默认值继续", file=sys.stderr)
+        return default
 
 
 def save_json(path: Path, data) -> None:
@@ -64,11 +72,15 @@ class Config:
     def load() -> "Config":
         raw = load_json(CONFIG_PATH, {})
         home = Path(os.path.expanduser("~"))
+        env = os.environ
         return Config(
-            remote=raw.get("remote", ""),
-            branch=raw.get("branch", "main"),
-            sessions_root=Path(raw.get("sessionsRoot", home / ".dsh" / "sessions")),
-            work=Path(raw.get("work", str(HERE / ".work"))),
+            remote=env.get("DSH_SESSION_CLOUD_REMOTE", raw.get("remote", "")),
+            branch=env.get("DSH_SESSION_CLOUD_BRANCH", raw.get("branch", "main")),
+            sessions_root=Path(env.get(
+                "DSH_SESSION_CLOUD_SESSIONS_ROOT",
+                raw.get("sessionsRoot", home / ".dsh" / "sessions"),
+            )),
+            work=Path(env.get("DSH_SESSION_CLOUD_WORK", raw.get("work", str(HERE / ".work")))),
         )
 
 
@@ -355,7 +367,16 @@ def main() -> None:
     q.set_defaults(func=cmd_pull)
 
     args = ap.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except subprocess.CalledProcessError as err:
+        # git 失败（远端不可达 / 权限 / 仓库不收）不要吐 traceback：
+        # 宿主插件会把这行字直接展示给用户。
+        lines = ((err.stderr or "") + (err.stdout or "")).strip().splitlines()
+        detail = lines[-1] if lines else str(err)
+        sys.exit(f"git 操作失败（远端不可达或无权限）：{detail}")
+    except FileNotFoundError as err:
+        sys.exit(f"缺少可执行文件：{err.filename or err}（确认 git / python 在 PATH 里）")
 
 
 if __name__ == "__main__":
