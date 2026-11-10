@@ -133,7 +133,13 @@ def resolve(entries, wanted: str | None, all_flag: bool):
         return entries
     if not wanted:
         sys.exit("要么给 --session <id 前缀>，要么给 --all")
-    hit = [e for e in entries if e[1].startswith(wanted) or e[1] == f"session-{wanted}"]
+    # 目录名就是会话 id；但子代理会话的 id 不带 "session-" 前缀，用户习惯带上，所以两头都试。
+    wanted = wanted.strip()
+    bare = wanted.removeprefix("session-")
+    hit = [
+        e for e in entries
+        if e[1] == wanted or e[1] == bare or e[1] == f"session-{bare}" or e[1].startswith(bare)
+    ]
     if not hit:
         sys.exit(f"没有匹配的会话：{wanted}")
     if len(hit) > 1:
@@ -286,8 +292,14 @@ def cmd_pull(args) -> None:
             dst = cfg.sessions_root / ws_dir.name / s_dir.name
             dst.mkdir(parents=True, exist_ok=True)
             for item in s_dir.iterdir():
-                if item.is_file():
-                    shutil.copy2(item, dst / item.name)
+                if not item.is_file():
+                    continue
+                target = dst / item.name
+                staging = target.with_name(target.name + ".part")
+                shutil.copy2(item, staging)
+                # 原子替换：DSH 的扫描器只认名为 session.v4.jsonl.zstd 的文件，
+                # .part 中途不会被当成"半截会话"列出来。
+                os.replace(staging, target)
             state = load_json(STATE_PATH, {})
             state.setdefault(s_dir.name, {})["mode"] = "cloud"
             state[s_dir.name]["pulledAt"] = time.strftime("%Y-%m-%d %H:%M:%S")

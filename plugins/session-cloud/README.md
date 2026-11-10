@@ -61,6 +61,19 @@ index/<workspaceKey>/<sessionId>.json                      # 索引：大小/sha
 - 拉到全新的 sessions 根目录 → **sha256 与源文件完全一致**（`0f3f229a8743…`）；
 - `--no-git` 路径同样 sha256 一致（离线验证用）。
 
+**换机演练（真做了一遍"删本地 → 云端拉回"）**：拿真实子代理会话 `4ae16c7d-…`（288,718 B），`push` 后把本机会话目录整体移走，再 `pull` 回来：
+
+- sha256 与原件一致（`d9f22622…`）；
+- 解开 zstd 首行 header：`id`、`cwd`、`version` 都在，是能被加载的会话而不是裸字节；
+- 说明"列表里会不会出现"不需要注册：DSH 的 `list()` 每次都 `readdir` 扫 `<root>/<project>/<session>/session.v4.jsonl.zstd` 并解析 header，`workspace.json`/`storages` 只是视图态。
+
+**两条硬约束**（踩出来的）：
+
+1. **别在 `sessions/` 根目录留备份副本**（`.bak` 也不行）——同一个 id 出现两份会让扫描器直接抛 `duplicate JSONL session id`，整个会话列表报废。备份只在 git 仓库里。
+2. `pull` 落盘是原子的（先写 `.part` 再 `os.replace`），避免扫描器读到半截文件。
+
+另：子代理会话 id **不带** `session-` 前缀，主会话带（`session-…`）；`--session` 传不传前缀都能匹配。
+
 ## 安全默认值
 
 1. 默认仅本机；不配置远端就什么都不会发生。

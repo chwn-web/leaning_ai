@@ -215,4 +215,22 @@ meta 放**兄弟目录** `index/`，不放进会话目录——避免一个不�
 
 **未做（按 §9 里程碑顺延）**：附件、未闭合 turn 的精确判断（需解析日志）、cwd 改写、投影缓存预热、UI chip、storage domain、设置页、加密。
 
+### 13.1 换机演练（2026-11-10，真实验收）
+
+拿一条真实子代理会话（`4ae16c7d-…`，288,718 B，sha256 `d9f22622…`）完整走了一遍"换电脑"：
+
+1. `push` → 本地 bare 仓库，提交里能看到 `sessions/--D-TCL-leaning_AI_agent--/4ae16c7d-…/session.v4.jsonl.zstd`；
+2. **把本机会话目录整体移走**（模拟换机 / 重置），磁盘上不再有这条会话；
+3. `pull` → 目录与文件重新出现，**sha256 与原件完全一致**；
+4. 用 `zlib zstd` 解开首行 header：`id` 与目录名一致、`cwd` 保留、`version` 正常 —— 说明拉回来的东西是**可被加载的会话**，不是一坨字节。
+
+**为什么"能被列出来"不需要额外注册**（读 `dsh-session-persistence-jsonl` 的 `list()` 实现确认）：每次 `list` 都重新 `readdir` 扫 `<root>/<projectDir>/<sessionDir>/session.v4.jsonl.zstd`，读首行 header、`assertStoredIdentity` 校验后入列。`workspace.json` / `storages/*` 只是标题、置顶、归档这类视图态，**不是会话存在的必要条件**。所以磁盘上出现一份字节一致的目录 = 列表里出现这条会话。
+
+**由此得到两条实现约束（v0.1b 已按此加固）：**
+
+- **绝不能在 `sessions/` 根目录里留备份副本**（`.bak` 也不行）：扫描器会看到同一个 id 两份，直接抛 `duplicate JSONL session id "…" appears in multiple project directories`，把整个列表弄坏。演练时我移走的目录必须立刻删除，不能用"改名留着"当备份——真备份在 git 仓库里。
+- **落盘必须原子**：`pull` 改成先写 `session.v4.jsonl.zstd.part` 再 `os.replace`，否则扫描器可能读到半截文件（`.part` 不在它的文件名白名单里，中途不会被当成会话）。
+
+**另一处踩坑**：子代理会话的 id **不带** `session-` 前缀（目录名 `4ae16c7d-…`），主会话才带（`session-f2cbe70e-…`）。`resolve()` 已改成带不带前缀都能匹配。
+
 **环境注记**：本机 Windows 沙箱会拦 `msys` 命名管道，`git clone/fetch/push` 在受限模式报 `sh.exe: couldn't create signal pipe, Win32 error 5`；引擎在正常环境下无需特殊配置，受限沙箱里需完整访问权限或走 `--no-git`。
