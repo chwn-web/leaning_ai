@@ -67,12 +67,17 @@ index/<workspaceKey>/<sessionId>.json                      # 索引：大小/sha
 - 解开 zstd 首行 header：`id`、`cwd`、`version` 都在，是能被加载的会话而不是裸字节；
 - 说明"列表里会不会出现"不需要注册：DSH 的 `list()` 每次都 `readdir` 扫 `<root>/<project>/<session>/session.v4.jsonl.zstd` 并解析 header，`workspace.json`/`storages` 只是视图态。
 
-**两条硬约束**（踩出来的）：
-
-1. **别在 `sessions/` 根目录留备份副本**（`.bak` 也不行）——同一个 id 出现两份会让扫描器直接抛 `duplicate JSONL session id`，整个会话列表报废。备份只在 git 仓库里。
+**两条硬约束**（踩出来的）：1. **别在 `sessions/` 根目录留备份副本**（`.bak` 也不行）——同一个 id 出现两份会让扫描器直接抛 `duplicate JSONL session id`，整个会话列表报废。备份只在 git 仓库里。
 2. `pull` 落盘是原子的（先写 `.part` 再 `os.replace`），避免扫描器读到半截文件。
 
 另：子代理会话 id **不带** `session-` 前缀，主会话带（`session-…`）；`--session` 传不传前缀都能匹配。
+
+## 模式语义（v0.1b，实测过）
+
+- `mode --to local` / chip 切「仅本机」之后，`push --all` **不会再上传它**，输出里会写 `按「仅本机」跳过 N 条`；云端保留最后一次的快照，不会删。
+- 点名强推某条：`push --session <id> --include-local`（只影响 `--session` 指定的那一条）。
+- 没有被记录过模式的会话，按 `cloud` 处理（先保证"机器重置也不丢"）；要排除就显式设成 local。
+- **修过一个会伤数据的 bug**：旧版 `push` 完全忽略 mode，还会把 `mode` 强制写回 `cloud` —— 等于每 2 小时的自动备份把用户刚点的「仅本机」悄悄改回云同步，并且照样上传。现在 mode 只由 `mode` 命令/chip 写。
 
 ## 安全默认值
 

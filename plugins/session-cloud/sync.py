@@ -174,7 +174,7 @@ def cmd_status(args) -> None:
             "session": sid,
             "size": st.st_size,
             "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
-            "mode": mode_state.get(sid, {}).get("mode", "local"),
+            "mode": mode_state.get(sid, {}).get("mode", "cloud"),
             "syncedAt": mode_state.get(sid, {}).get("syncedAt", ""),
         }
         rows.append(meta)
@@ -213,8 +213,18 @@ def cmd_push(args) -> None:
         print("没有可推送的会话")
         return
     pushed = 0
+    skipped_local = 0
+    explicit = args.session is not None
     for ws, sid, d in targets:
         f = d / SESSION_FILE
+        state = load_json(STATE_PATH, {})
+        # 「仅本机」是用户明确的选择：除非点名 --include-local，否则绝不自动上传。
+        # 旧版这里会把 mode 强制写回 cloud，等于每 2 小时的自动备份把用户的开关覆盖掉。
+        # 没有记录的会话按 cloud 处理：先保证"机器重置也不丢"，要排除得显式设成 local。
+        mode = state.get(sid, {}).get("mode", "cloud")
+        if mode == "local" and not (explicit and args.include_local):
+            skipped_local += 1
+            continue
         age = time.time() - f.stat().st_mtime
         if age < QUIET_SECONDS and not args.force:
             print(f"跳过 {sid}：会话 {int(age)}s 前还在写（{QUIET_SECONDS}s 内视为未闭合），--force 可强推")
@@ -236,13 +246,13 @@ def cmd_push(args) -> None:
             "note": "v0.1a: 附件未同步",
         }
         save_json(work / "index" / ws / f"{sid}.json", meta)
-        state = load_json(STATE_PATH, {})
-        state.setdefault(sid, {})["mode"] = "cloud"
-        state[sid]["syncedAt"] = meta["pushedAt"]
+        state.setdefault(sid, {})["syncedAt"] = meta["pushedAt"]
         state[sid]["sha256"] = digest
         save_json(STATE_PATH, state)
         print(f"已打包 {sid}（{meta['sizeBytes'] / 1024:.1f} KB, sha256 {digest[:12]}…）")
         pushed += 1
+    if skipped_local:
+        print(f"按「仅本机」跳过 {skipped_local} 条（要强推某条：push --session <id> --include-local）")
     if not pushed:
         return
     if not use_git:
@@ -335,6 +345,7 @@ def main() -> None:
     p.add_argument("--all", action="store_true")
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-git", action="store_true", help="只写入工作副本，不提交不推送（离线验字节链路用）")
+    p.add_argument("--include-local", action="store_true", help="点名推送一条「仅本机」会话（只作用于 --session 指定的那一条）")
     p.set_defaults(func=cmd_push)
 
     q = sub.add_parser("pull", help="从远端拉取会话")
