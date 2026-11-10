@@ -158,6 +158,10 @@ window.__ModuleLoader__.load({
       var busy = busyState[0]
       var setBusy = busyState[1]
 
+      var confirmState = React.useState(false)
+      var confirming = confirmState[0]
+      var setConfirming = confirmState[1]
+
       var rootRef = React.useRef(null)
 
       // Initial read: show the persisted mode the moment the chip appears.
@@ -185,16 +189,32 @@ window.__ModuleLoader__.load({
         var onKeyDown = function (event) {
           if (event && (event.key === 'Escape' || event.key === 'Esc')) setOpen(false)
         }
-        var onViewportChange = function () { setOpen(false) }
+        // Scrolling must NOT close the menu: the chip sits inside the composer's
+        // scroll container, so the click itself can emit a scroll event and the
+        // menu would vanish before the user ever sees it. Reposition instead.
+        var reposition = function () {
+          try {
+            var root = rootRef.current
+            if (!root || !root.getBoundingClientRect) return
+            var rect = root.getBoundingClientRect()
+            var width = 168
+            var left = Math.round(rect.left)
+            var maxLeft = (window.innerWidth || 0) - width - 8
+            if (maxLeft > 0 && left > maxLeft) left = maxLeft
+            setAnchor({ left: left < 8 ? 8 : left, top: Math.round(rect.bottom) + 6 })
+          } catch (err) {
+            // keep the previous anchor
+          }
+        }
         document.addEventListener('mousedown', onPointerDown, true)
         document.addEventListener('keydown', onKeyDown, true)
-        window.addEventListener('resize', onViewportChange)
-        window.addEventListener('scroll', onViewportChange, true)
+        window.addEventListener('resize', reposition)
+        window.addEventListener('scroll', reposition, true)
         return function () {
           document.removeEventListener('mousedown', onPointerDown, true)
           document.removeEventListener('keydown', onKeyDown, true)
-          window.removeEventListener('resize', onViewportChange)
-          window.removeEventListener('scroll', onViewportChange, true)
+          window.removeEventListener('resize', reposition)
+          window.removeEventListener('scroll', reposition, true)
         }
       }, [open])
 
@@ -215,22 +235,21 @@ window.__ModuleLoader__.load({
           }
         }
         setHoveredItem(-1)
+        if (!next) setConfirming(false)
         setOpen(next)
       }
 
       function choose(nextMode) {
-        setOpen(false)
         if (busy || sessionId === '') return
-        if (view.phase === 'ready' && view.mode === nextMode) return
-        if (nextMode === 'cloud') {
-          var confirmed = false
-          try {
-            confirmed = window.confirm('把这条会话同步到云端？\n（之后每 2 小时自动备份会包含它）')
-          } catch (err) {
-            confirmed = false
-          }
-          if (!confirmed) return
+        if (view.phase === 'ready' && view.mode === nextMode) { setOpen(false); return }
+        // 原生 window.confirm 在 Tauri WebView 里可能被吞掉（点了没反应），
+        // 所以确认这一步做在菜单里：先切到 confirming，再由面板上的两个按钮决定。
+        if (nextMode === 'cloud' && !confirming) {
+          setConfirming(true)
+          return
         }
+        setConfirming(false)
+        setOpen(false)
         setBusy(true)
         postMode(sessionId, nextMode).then(function (data) {
           setView({ phase: 'ready', mode: normaliseMode(data.mode), error: '' })
@@ -307,6 +326,61 @@ window.__ModuleLoader__.load({
           }, h('span', null, '🖥 仅本机'), current === 'local' ? check : h('span', { style: { minWidth: '10px' } })),
         ]
 
+        if (confirming) {
+          var confirmTitle = {
+            padding: '6px 8px 2px',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: TONE.menuText,
+          }
+          var confirmBody = {
+            padding: '2px 8px 6px',
+            fontSize: '11px',
+            lineHeight: '16px',
+            color: TONE.menuMuted,
+          }
+          var confirmButton = {
+            flex: '1 1 0',
+            height: '24px',
+            padding: '0 8px',
+            boxSizing: 'border-box',
+            borderRadius: '6px',
+            border: '1px solid ' + TONE.menuBorder,
+            background: 'transparent',
+            color: TONE.menuText,
+            fontSize: '11.5px',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }
+          var confirmPrimary = Object.assign({}, confirmButton, {
+            border: '1px solid ' + TONE.cloudText,
+            color: TONE.cloudText,
+            fontWeight: 600,
+          })
+          items = [
+            h('div', { key: 'confirm-title', style: confirmTitle }, '同步到云端？'),
+            h('div', { key: 'confirm-body', style: confirmBody },
+              '开启后这条会话会随每 2 小时的自动备份上传到你的私有仓库；切回「仅本机」不会删除云端已有的副本。'),
+            h('div', {
+              key: 'confirm-actions',
+              style: { display: 'flex', gap: '6px', padding: '2px 6px 4px' },
+            }, [
+              h('button', {
+                key: 'confirm-yes',
+                type: 'button',
+                style: confirmPrimary,
+                onClick: function () { choose('cloud') },
+              }, '确认同步'),
+              h('button', {
+                key: 'confirm-no',
+                type: 'button',
+                style: confirmButton,
+                onClick: function () { setConfirming(false) },
+              }, '取消'),
+            ]),
+          ]
+        }
+
         if (view.phase === 'error') {
           items.push(h('div', {
             key: 'note',
@@ -352,6 +426,9 @@ window.__ModuleLoader__.load({
             style: chipStyle,
             onMouseEnter: function () { setHover(true) },
             onMouseLeave: function () { setHover(false) },
+            // 阻止焦点跳转：composer 是滚动容器，按钮拿到焦点会把视图滚一下，
+            // 表现就是"点了菜单没出来、页面往上跳"。
+            onMouseDown: function (event) { if (event && event.preventDefault) event.preventDefault() },
             onClick: toggleOpen,
           }, chipLabel(view)),
           open ? h('div', { key: 'menu', role: 'menu', style: menuStyle }, items) : null,
