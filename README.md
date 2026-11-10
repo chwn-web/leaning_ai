@@ -56,15 +56,21 @@ W25-40 投递与面试                   → offer
 │   ├── 04-术语表.md
 │   └── 05-常见误解.md
 ├── projects/              # 代码（P0–P4）
-│   ├── _template/         # ★ 统一骨架：零依赖、可直接 node 跑
+│   ├── _template-py/      # ★ 主线骨架：Python 零依赖，可直接 python 跑
+│   ├── _template/         # TS 对照版（学前端/做界面时看）
 │   └── README.md
+├── plugins/               # 自研 DSH 插件（可上架）
+│   └── session-cloud/     # 会话级「仅本机 / 云同步」：设计稿 + v0.1a 引擎
 ├── research/              # 岗位与面试调研（证据）
 │   ├── job-market-2027.md
-│   └── interview-bank.md
-├── notes/                 # 自评、周记、面试复盘
+│   ├── interview-bank.md
+│   └── douyin-7694618490191453352-transcript.md
+├── notes/                 # 自评、周记、面试复盘、我的素材
 │   ├── 自评.md
 │   ├── 周记模板.md
-│   └── 面试复盘.md
+│   ├── 面试复盘.md
+│   ├── 我的素材.md
+│   └── 会话同步与备份.md
 └── scripts/
     └── check-links.mjs    # 知识库死链检查：node scripts/check-links.mjs
 ```

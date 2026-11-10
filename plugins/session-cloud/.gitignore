@@ -1,0 +1,6 @@
+# 本机私有数据，不进仓库
+config.json
+state.json
+.work/
+__pycache__/
+*.pyc
