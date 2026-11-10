@@ -397,12 +397,16 @@ window.__ModuleLoader__.load({
           }, '引擎不可用', h('div', { style: { opacity: 0.75 } }, '检查 python 与 sync.py 是否就位')))
         }
 
+        // 宿主正文区的某个祖先带 transform，`position: fixed` 会被解析成
+        // "相对那个祖先"，菜单因此跑到屏幕另一头。改成相对 chip 自身的绝对定位，
+        // 并且朝上开（chip 在输入框工具行上，下面没有空间）。
         var menuStyle = {
-          position: 'fixed',
-          left: anchor.left + 'px',
-          top: anchor.top + 'px',
+          position: 'absolute',
+          left: '0px',
+          bottom: 'calc(100% + 6px)',
           zIndex: 2147483000,
-          minWidth: '168px',
+          width: '224px',
+          maxWidth: 'calc(100vw - 24px)',
           padding: '4px',
           boxSizing: 'border-box',
           background: TONE.menuBg,
@@ -410,6 +414,7 @@ window.__ModuleLoader__.load({
           borderRadius: '8px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
           fontFamily: 'inherit',
+          textAlign: 'left',
         }
 
         return h('span', {
