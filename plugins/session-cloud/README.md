@@ -115,3 +115,19 @@ index/<workspaceKey>/<sessionId>.json                      # 索引：大小/sha
 1. **UI 插件**：`conversation.input.left` 放 chip（🖥 仅本机 ▾ / ☁ 云同步），切换时弹数据清单确认框。
 2. 把 `state.json` 换成 `ctx.storage.domain('session-cloud')`，把 `push/pull` 挂到 `/_session-cloud/*` 路由后由 UI 调用。
 3. 附件同步 + 换机向导 + 加密（v0.2 / v0.3）。
+
+
+## 发布（npm + 插件市场）
+
+插件已改名为 **`dsh-session-anywhere`**（npm 上 `dsh-session-cloud` 已被他人占用，且那个是全库镜像、我们是逐会话选择）。
+独立的发布仓库已拆好：`D:\TCL\dsh-session-anywhere`（`git init` 已提交 `f9440b6`，`pnpm pack --dry-run` 仍是同样的 8 个文件）。
+
+上架路径（awesome-dsh-plugin）：
+
+1. 在 GitHub 建公开仓库 `chwn-web/dsh-session-anywhere`，加 topic **`dsh-plugin`**，把该目录推上去；
+2. `pnpm publish`（需要 npm 登录；本机 `%USERPROFILE%\.npmrc` 目前没有 token）；
+3. 仓库满 1 天后，向 `awesome-dsh-plugin/awesome-dsh-plugin` 提 PR，只加一个文件
+   `data/plugins/chwn-web__dsh-session-anywhere.yml`（内容已生成在发布仓库的 `submit/` 里）；
+4. 合并后自动出现在市场卡片，安装命令由目录侧生成 `dsh plugin add dsh-session-anywhere`。
+
+分类用 `session`。收录硬门槛：`package.json` 必须声明 `dsh.bundle`（我们已声明）、仓库满 1 天、带 `dsh-plugin` topic、有真实可用代码、持续维护。
